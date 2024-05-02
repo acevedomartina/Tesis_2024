@@ -1,0 +1,2 @@
+N,p,gsyn,nloop,cant_seed,dt,itmax,itstim,amp_corriente,type_target,amp0,ftrain,alpha,sigman,vt,b,results_file
+200,0.3,0.5,16,20,0.1,2000,200,6,disc,4,1,0.25,1,0.5,0.5,simulacion_4_resultados.csv
