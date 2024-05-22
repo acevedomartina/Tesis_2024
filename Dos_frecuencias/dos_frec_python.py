@@ -6,35 +6,14 @@ import pandas as pd
 import csv
 import os
 
-def crear_subcarpeta(nombre_carpeta, nombre_subcarpeta):
-    
-    subcarpeta_path_total = (os.path.join(nombre_carpeta, nombre_subcarpeta))
-    if not os.path.exists(subcarpeta_path_total):
-        os.makedirs(subcarpeta_path_total)
-    
-    return subcarpeta_path_total
-
-def crear_carpetas(num_simulacion):
-
-    nombre_carpeta = f"simulacion_{num_simulacion}"
-    if not os.path.exists(nombre_carpeta):
-        os.makedirs(nombre_carpeta)
-
-    nombre_subcarpeta_act = f"simulacion_{num_simulacion}_ejemplos_actividad"
-    nombre_subcarpeta_pesos = f"simulacion_{num_simulacion}_matrices_pesos"
-
-    sub_act = crear_subcarpeta(nombre_carpeta, nombre_subcarpeta_act)
-    sub_pesos = crear_subcarpeta(nombre_carpeta, nombre_subcarpeta_pesos)
-
-    return nombre_carpeta, sub_act, sub_pesos
 
 ##PARÁMETROS
 
-N = 700                                   # numero de neuronas
+N = 500                                   # numero de neuronas
 N2 = int(N/2)
 
 #Conexiones sinápticas
-p = 0.3                                   # probabilidad de elementos no nulos en la matriz de pesos
+p = 1                                   # probabilidad de elementos no nulos en la matriz de pesos
 gsyn = 0.5                                # peso sinaptico inicial
 
 alpha = 0.25                              # regularizador pesos
@@ -67,7 +46,31 @@ ftrain = 1                                # fraccón de neuronas a entrenar
 nloop  = 16                              # numero de loops, 0 pre-entramiento, ultimo: post-entrenamiento. Poner nloop=2 para no hacer aprendizaje
 nloop_train = 10                         #ultimo loop de entrenamiento
 
-cant_seed = 20
+cant_seed = 10
+
+
+## FUNCIONES
+def crear_subcarpeta(nombre_carpeta, nombre_subcarpeta):
+    
+    subcarpeta_path_total = (os.path.join(nombre_carpeta, nombre_subcarpeta))
+    if not os.path.exists(subcarpeta_path_total):
+        os.makedirs(subcarpeta_path_total)
+    
+    return subcarpeta_path_total
+
+def crear_carpetas(num_simulacion):
+
+    nombre_carpeta = f"simulacion_{num_simulacion}"
+    if not os.path.exists(nombre_carpeta):
+        os.makedirs(nombre_carpeta)
+
+    nombre_subcarpeta_act = f"simulacion_{num_simulacion}_ejemplos_actividad"
+    nombre_subcarpeta_pesos = f"simulacion_{num_simulacion}_matrices_pesos"
+
+    sub_act = crear_subcarpeta(nombre_carpeta, nombre_subcarpeta_act)
+    sub_pesos = crear_subcarpeta(nombre_carpeta, nombre_subcarpeta_pesos)
+
+    return nombre_carpeta, sub_act, sub_pesos
 
 def crear_archivo_parametros(filename_resultados, num_simulacion, nombre_carpeta):
  #file donde guardo los parámetros de la simulación
@@ -352,10 +355,12 @@ def dpr_bias(ccorr,N,nloop):
     return dpr_bias
 
 
+## SIMULACION
+
 romega1_vec = np.array([1])
 romega2_vec = np.array([5])
+num_simulacion = 9
 
-num_simulacion = 7
 for i in range(len(romega1_vec)):
     print(i)
     romega1 = romega1_vec[i]
@@ -373,7 +378,8 @@ for i in range(len(romega1_vec)):
     #file donde voy a guardar los resultados (CC, taus)
     filename_resultados = f'simulacion_{num_simulacion}_resultados.csv'
     csv_file_path = os.path.join(nombre_carpeta, filename_resultados)
-    column_names = [ 'pqif' ,'seed','nloop', 'cc', 'sigma2','tau_rec','tau_div','tau_con','tau_chn']
+    column_names = [ 'pqif' ,'seed','nloop', 'cc_lif', 'cc_qif', 'cc', 'sigma2','tau_rec','tau_div','tau_con','tau_chn']
+
 
     crear_archivo_parametros(filename_resultados, num_simulacion, nombre_carpeta)
 
@@ -387,21 +393,14 @@ for i in range(len(romega1_vec)):
         if file.tell() == 0:
             writer.writerow(column_names)
 
-        for pqif in [0, 0.5, 1]:
-            print(pqif)
-            ci_lif_prom = 0
-            ci_qif_prom = 0
+        for pqif in [1]:
             
         
-            
             nqif=int(N*pqif)
 
-            cc_lif_prom = np.zeros(nloop)
-            cc_qif_prom = np.zeros(nloop)
-
             
-            for seed in range(6, cant_seed):
-
+            for seed in range(cant_seed):
+                print('Semilla:', seed)
                 np.random.seed(seed = seed)
                 itrain=np.random.binomial(1,ftrain,N)
 
@@ -442,11 +441,10 @@ for i in range(len(romega1_vec)):
                 # acumulacion modificacion de matrices
                 modw=[]
                 modt=[]
-                # acumulacion Pearson  CC
-                cc= np.zeros(nloop)
 
 
-                for iloop in range(nloop):  
+                for iloop in range(nloop): 
+                    print('iloop: ',iloop) 
 
                     t=0
                     for it in range(itmax):
@@ -505,9 +503,9 @@ for i in range(len(romega1_vec)):
                         guardar_matriz_csv(w, path_w_seed)
                         
                     # Pearson correlation
-                    
                     ci=0
-
+                    ci_lif = 0
+                    ci_qif = 0
                     for i in range(N):
                         m1=1+itstim+iloop*itmax
                         m2=m1+itmax-itstim
@@ -515,16 +513,25 @@ for i in range(len(romega1_vec)):
 
                         if np.var(target[i, itstim:]) > 0 and np.var(rout[m1:m2, i]) > 0:
                             ci += pearsonr(target[i, itstim:], rout[m1:m2, i])[0] * itrain[i]
+                            if(i < N/2):
+                                ci_lif += pearsonr(target[i, itstim:], rout[m1:m2, i])[0] * itrain[i]
+                            if (i >= N/2):
+                                ci_qif += pearsonr(target[i, itstim:], rout[m1:m2, i])[0] * itrain[i]
 
 
+                    ci_lif/=int(ftrain*N/2)
+                    ci_qif/=int(ftrain*N/2)
                     ci /= int(ftrain*N)
-                    cc[iloop] += ci/cant_seed
+
+
 
 
                     writer.writerow([
                         pqif,
                         seed,
                         iloop,
+                        ci_lif,
+                        ci_qif,
                         ci,
                         sigma2,
                         tau_rec,
